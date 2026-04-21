@@ -40,7 +40,7 @@
           <div class="flow-step">
             <span class="flow-number">2</span>
             <strong>FILL_FORM</strong>
-            <span>Add date, location, rate, gear, and load in.</span>
+            <span>Add date, start/end time, location, rate, gear, and load in.</span>
           </div>
           <div class="flow-connector" aria-hidden="true">
             <span class="flow-line"></span>
@@ -98,6 +98,20 @@
             Date
             <div class="input-shell input-shell-date">
               <input name="date" type="date" required />
+            </div>
+          </label>
+
+          <label>
+            Start time
+            <div class="input-shell input-shell-time">
+              <input name="startTime" type="time" required />
+            </div>
+          </label>
+
+          <label>
+            End time
+            <div class="input-shell input-shell-time">
+              <input name="endTime" type="time" required />
             </div>
           </label>
 
@@ -165,7 +179,7 @@
       <section class="panel panel-muted">
         <h2>Output</h2>
         <ol class="steps">
-          <li>A new Music event is created in my calendar.</li>
+          <li>A new timed Music event is created in my calendar.</li>
           <li>I also get an email notifying me of your booking.</li>
           <li>If anything is unclear, I follow up directly.</li>
         </ol>

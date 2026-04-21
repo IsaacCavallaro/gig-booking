@@ -280,7 +280,8 @@ h2 {
 }
 
 .booking-form select,
-.booking-form input[type="date"] {
+.booking-form input[type="date"],
+.booking-form input[type="time"] {
   min-height: 50px;
 }
 
@@ -288,14 +289,16 @@ h2 {
   padding-right: 54px;
 }
 
-.booking-form input[type="date"] {
+.booking-form input[type="date"],
+.booking-form input[type="time"] {
   color-scheme: dark;
   position: relative;
   min-width: 0;
 }
 
 .input-shell-select::after,
-.input-shell-date::after {
+.input-shell-date::after,
+.input-shell-time::after {
   position: absolute;
   right: 14px;
   top: 50%;
@@ -313,11 +316,25 @@ h2 {
   content: "[cal]";
 }
 
+.input-shell-time::after {
+  content: "[24h]";
+}
+
 .booking-form input[type="date"]::-webkit-calendar-picker-indicator {
   position: absolute;
   right: 0;
   top: 0;
   width: 48px;
+  height: 100%;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.booking-form input[type="time"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 52px;
   height: 100%;
   cursor: pointer;
   opacity: 0;
@@ -329,6 +346,14 @@ h2 {
 .booking-form input[type="date"]::-webkit-datetime-edit-month-field,
 .booking-form input[type="date"]::-webkit-datetime-edit-day-field,
 .booking-form input[type="date"]::-webkit-datetime-edit-year-field {
+  color: var(--text);
+}
+
+.booking-form input[type="time"]::-webkit-datetime-edit,
+.booking-form input[type="time"]::-webkit-datetime-edit-fields-wrapper,
+.booking-form input[type="time"]::-webkit-datetime-edit-text,
+.booking-form input[type="time"]::-webkit-datetime-edit-hour-field,
+.booking-form input[type="time"]::-webkit-datetime-edit-minute-field {
   color: var(--text);
 }
 

@@ -19,7 +19,7 @@ This project gives you one link to send to bookers so they can check availabilit
 - Gives bookers a single booking link instead of a fragmented message thread.
 - Uses your public Google Calendar as the availability source of truth.
 - Lets the booker submit the key details in one form.
-- Creates a `Music (...)` placeholder event automatically in Google Calendar.
+- Creates a timed `Music (...)` placeholder event automatically in Google Calendar.
 - Sends you an email notification for each accepted submission.
 - Keeps the whole setup simple, lightweight, and free for normal personal use.
 
@@ -30,13 +30,15 @@ This project gives you one link to send to bookers so they can check availabilit
 3. They submit:
    - music type
    - date
+   - start time
+   - end time
    - location
    - rate
    - gear provided
    - load in
    - optional contact
    - optional notes
-4. Google Apps Script creates an all-day placeholder event in the target calendar.
+4. Google Apps Script creates a timed placeholder event in the target calendar.
 5. You receive an email notification with the submitted details.
 
 If the bandleader or organiser wants to own the final invite, they can still create and send a separate Google Calendar invite later. This flow is only for pencilling the date in fast so it does not get double booked.

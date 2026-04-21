@@ -21,6 +21,8 @@ function doPost(e) {
     const params = e && e.parameter ? e.parameter : {};
     const musicType = clean(params.musicType) || "Gigs";
     const dateValue = params.date;
+    const startTime = clean(params.startTime);
+    const endTime = clean(params.endTime);
     const location = clean(params.location);
     const rate = clean(params.rate);
     const gearProvided = clean(params.gearProvided);
@@ -31,7 +33,7 @@ function doPost(e) {
     const website = clean(params.website);
     const startedAt = clean(params.startedAt);
 
-    if (!dateValue || !location || !rate || !gearProvided || !loadIn) {
+    if (!dateValue || !startTime || !endTime || !location || !rate || !gearProvided || !loadIn) {
       return textResponse("Missing required fields.");
     }
 
@@ -49,10 +51,19 @@ function doPost(e) {
       return textResponse("Calendar not found.");
     }
 
-    const eventDate = parseDateValue(dateValue);
+    const calendarTimeZone = calendar.getTimeZone();
+    const eventStart = parseDateTimeValue(dateValue, startTime, calendarTimeZone);
+    const eventEnd = parseDateTimeValue(dateValue, endTime, calendarTimeZone);
+
+    if (eventEnd.getTime() <= eventStart.getTime()) {
+      eventEnd.setDate(eventEnd.getDate() + 1);
+    }
+
     const fingerprint = buildFingerprint({
       musicType,
       dateValue,
+      startTime,
+      endTime,
       location,
       rate,
       gearProvided,
@@ -69,6 +80,8 @@ function doPost(e) {
       "",
       `Music type: ${musicType}`,
       `Date: ${dateValue}`,
+      `Start time: ${startTime}`,
+      `End time: ${endTime}`,
       `Location: ${location}`,
       `Rate: ${rate}`,
       `Gear provided: ${gearProvided}`,
@@ -80,9 +93,10 @@ function doPost(e) {
       notes || "-",
     ].join("\n");
 
-    const event = calendar.createAllDayEvent(
+    const event = calendar.createEvent(
       `${EVENT_TITLE_PREFIX} (${musicType}): ${location}`,
-      eventDate,
+      eventStart,
+      eventEnd,
       {
         description,
         location,
@@ -97,6 +111,8 @@ function doPost(e) {
       sendBookingNotification({
         musicType,
         dateValue,
+        startTime,
+        endTime,
         location,
         rate,
         gearProvided,
@@ -135,6 +151,8 @@ function buildFingerprint(details) {
   const raw = [
     details.musicType,
     details.dateValue,
+    details.startTime,
+    details.endTime,
     clean(details.location).toLowerCase(),
     clean(details.rate).toLowerCase(),
     clean(details.gearProvided).toLowerCase(),
@@ -183,6 +201,8 @@ function sendBookingNotification(details) {
     `Booker / contact: ${contactName}`,
     `Music type: ${details.musicType}`,
     `Date: ${details.dateValue}`,
+    `Start time: ${details.startTime}`,
+    `End time: ${details.endTime}`,
     `Location: ${details.location}`,
     `Rate: ${details.rate}`,
     `Gear provided: ${details.gearProvided}`,
@@ -237,18 +257,42 @@ function availabilityResponse(params) {
   });
 }
 
-function parseDateValue(dateValue) {
+function parseDateTimeValue(dateValue, timeValue, timezone) {
   const parts = String(dateValue).split("-");
+  const timeParts = String(timeValue).split(":");
 
-  if (parts.length !== 3) {
+  if (parts.length !== 3 || timeParts.length < 2) {
     throw new Error("Invalid date.");
   }
 
   const year = Number(parts[0]);
   const monthIndex = Number(parts[1]) - 1;
   const day = Number(parts[2]);
+  const hour = Number(timeParts[0]);
+  const minute = Number(timeParts[1]);
 
-  return new Date(year, monthIndex, day);
+  if ([year, monthIndex, day, hour, minute].some((value) => Number.isNaN(value))) {
+    throw new Error("Invalid time.");
+  }
+
+  const baseUtc = new Date(Date.UTC(year, monthIndex, day, hour, minute));
+  const offset = parseTimezoneOffset(Utilities.formatDate(baseUtc, timezone, "Z"));
+
+  return new Date(baseUtc.getTime() - offset * 60 * 1000);
+}
+
+function parseTimezoneOffset(offsetText) {
+  const match = String(offsetText).match(/^([+-])(\d{2})(\d{2})$/);
+
+  if (!match) {
+    return 0;
+  }
+
+  const sign = match[1] === "-" ? -1 : 1;
+  const hours = Number(match[2]);
+  const minutes = Number(match[3]);
+
+  return sign * (hours * 60 + minutes);
 }
 
 function collectBookedDates(events, timezone) {
