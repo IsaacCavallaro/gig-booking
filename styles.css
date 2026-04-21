@@ -471,6 +471,7 @@ h2 {
   justify-content: center;
   min-width: 28px;
   height: 28px;
+  margin-bottom: 4px;
   padding: 0 8px;
   border: 1px solid var(--line-strong);
   background: #161616;
