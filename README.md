@@ -122,10 +122,14 @@ Because the frontend is static, there is no build step required.
    - `CALENDAR_ID`
    - `EVENT_TITLE_PREFIX`
    - `NOTIFICATION_EMAIL`
-6. Keep these non-sensitive behavior values in code unless you want to tune them:
    - `DEFAULT_LOOKAHEAD_DAYS`
    - `MIN_SUBMIT_SECONDS`
    - `COOLDOWN_SECONDS`
+6. Recommended values:
+   - `EVENT_TITLE_PREFIX=Music`
+   - `DEFAULT_LOOKAHEAD_DAYS=90`
+   - `MIN_SUBMIT_SECONDS=4`
+   - `COOLDOWN_SECONDS=600`
 7. Deploy the project as a web app:
    - Execute as: `Me`
    - Who has access: `Anyone`
@@ -136,8 +140,26 @@ Because the frontend is static, there is no build step required.
 Important note:
 
 - `NOTIFICATION_EMAIL` should not live in the repo
-- the target write calendar ID also does not need to live in the repo backend code
+- the target write calendar ID should not live in the repo backend code
+- the anti-bot and availability settings are now also driven by Script Properties, so the backend can be tuned without committing personal configuration
 - the public availability calendar may still be inferable from the frontend because this project intentionally uses a public Google Calendar embed on a static site
+
+## Apps Script configuration
+
+The backend now reads all runtime configuration from Apps Script `Script Properties`.
+
+- `CALENDAR_ID`
+  The Google Calendar that receives pencilled booking events.
+- `EVENT_TITLE_PREFIX`
+  Prefix used when creating events, for example `Music`.
+- `NOTIFICATION_EMAIL`
+  Address that receives booking notifications.
+- `DEFAULT_LOOKAHEAD_DAYS`
+  Number of future days used when fetching availability.
+- `MIN_SUBMIT_SECONDS`
+  Minimum time a user must spend on the form before the submission is accepted.
+- `COOLDOWN_SECONDS`
+  Cache-based duplicate cooldown window.
 
 ## Frontend configuration
 

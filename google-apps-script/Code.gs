@@ -1,7 +1,3 @@
-const DEFAULT_LOOKAHEAD_DAYS = 90;
-const MIN_SUBMIT_SECONDS = 4;
-const COOLDOWN_SECONDS = 600;
-
 function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
   const action = clean(params.action);
@@ -39,7 +35,7 @@ function doPost(e) {
       return textResponse("Rejected.");
     }
 
-    if (!isOldEnough(startedAt)) {
+    if (!isOldEnough(startedAt, config.minSubmitSeconds)) {
       return textResponse("Rejected: submitted too quickly.");
     }
 
@@ -102,7 +98,7 @@ function doPost(e) {
     );
 
     event.setColor(CalendarApp.EventColor.PALE_GREEN);
-    rememberSubmission(fingerprint, event.getId());
+    rememberSubmission(fingerprint, event.getId(), config.cooldownSeconds);
     let mailStatus = "mail=ok";
 
     try {
@@ -141,6 +137,9 @@ function getConfig() {
   const calendarId = clean(props.getProperty("CALENDAR_ID"));
   const eventTitlePrefix = clean(props.getProperty("EVENT_TITLE_PREFIX")) || "Music";
   const notificationEmail = clean(props.getProperty("NOTIFICATION_EMAIL"));
+  const defaultLookaheadDays = getNumberProperty(props, "DEFAULT_LOOKAHEAD_DAYS", 90);
+  const minSubmitSeconds = getNumberProperty(props, "MIN_SUBMIT_SECONDS", 4);
+  const cooldownSeconds = getNumberProperty(props, "COOLDOWN_SECONDS", 600);
 
   if (!calendarId) {
     throw new Error("Missing script property: CALENDAR_ID");
@@ -154,17 +153,31 @@ function getConfig() {
     calendarId,
     eventTitlePrefix,
     notificationEmail,
+    defaultLookaheadDays,
+    minSubmitSeconds,
+    cooldownSeconds,
   };
 }
 
-function isOldEnough(startedAt) {
+function getNumberProperty(props, key, fallback) {
+  const raw = clean(props.getProperty(key));
+  const value = Number(raw);
+
+  if (!raw || Number.isNaN(value) || value <= 0) {
+    return fallback;
+  }
+
+  return value;
+}
+
+function isOldEnough(startedAt, minSubmitSeconds) {
   const startedAtMs = Number(startedAt);
 
   if (!startedAtMs || Number.isNaN(startedAtMs)) {
     return false;
   }
 
-  return Date.now() - startedAtMs >= MIN_SUBMIT_SECONDS * 1000;
+  return Date.now() - startedAtMs >= minSubmitSeconds * 1000;
 }
 
 function buildFingerprint(details) {
@@ -201,9 +214,9 @@ function isDuplicateSubmission(fingerprint) {
   return props.getProperty(fingerprint) !== null;
 }
 
-function rememberSubmission(fingerprint, eventId) {
+function rememberSubmission(fingerprint, eventId, cooldownSeconds) {
   const cache = CacheService.getScriptCache();
-  cache.put(fingerprint, eventId || "1", COOLDOWN_SECONDS);
+  cache.put(fingerprint, eventId || "1", cooldownSeconds);
 
   const props = PropertiesService.getScriptProperties();
   props.setProperty(fingerprint, JSON.stringify({
@@ -255,7 +268,7 @@ function testEmail() {
 function availabilityResponse(params) {
   const config = getConfig();
   const callback = clean(params.callback);
-  const days = Number(params.days) || DEFAULT_LOOKAHEAD_DAYS;
+  const days = Number(params.days) || config.defaultLookaheadDays;
   const calendar = CalendarApp.getCalendarById(config.calendarId);
 
   if (!calendar) {
@@ -362,4 +375,7 @@ function printSetupInstructions() {
   Logger.log("CALENDAR_ID=your-calendar-id@group.calendar.google.com");
   Logger.log("EVENT_TITLE_PREFIX=Music");
   Logger.log("NOTIFICATION_EMAIL=you@example.com");
+  Logger.log("DEFAULT_LOOKAHEAD_DAYS=90");
+  Logger.log("MIN_SUBMIT_SECONDS=4");
+  Logger.log("COOLDOWN_SECONDS=600");
 }
