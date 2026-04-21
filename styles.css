@@ -530,19 +530,19 @@ h2 {
 
 @media (max-width: 640px) {
   .page {
-    width: min(820px, calc(100% - 12px));
-    padding-top: 12px;
-    padding-bottom: 28px;
+    width: min(820px, calc(100% - 20px));
+    padding-top: 16px;
+    padding-bottom: 36px;
   }
 
   .panel {
-    padding: 16px;
-    margin-top: 12px;
+    padding: 18px;
+    margin-top: 14px;
   }
 
   .panel-header {
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
 
   h1 {
@@ -556,7 +556,7 @@ h2 {
   }
 
   .hero {
-    padding: 8px 0 14px;
+    padding: 10px 2px 18px;
   }
 
   .eyebrow {
@@ -584,7 +584,7 @@ h2 {
 
   .booking-form {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 14px;
   }
 
   #calendar-embed {
@@ -592,14 +592,14 @@ h2 {
   }
 
   .booking-form label {
-    gap: 6px;
+    gap: 7px;
     font-size: 0.76rem;
   }
 
   .booking-form input,
   .booking-form select,
   .booking-form textarea {
-    padding: 13px 12px;
+    padding: 14px 13px;
   }
 
   .booking-form select {
@@ -609,7 +609,7 @@ h2 {
   .button {
     width: 100%;
     min-height: 48px;
-    padding: 0 14px;
+    padding: 0 16px;
   }
 
   .actions {
@@ -617,15 +617,15 @@ h2 {
   }
 
   .steps {
-    padding-left: 24px;
+    padding-left: 26px;
   }
 
   .flow-chart {
-    gap: 8px;
+    gap: 10px;
   }
 
   .flow-step {
-    padding: 14px;
+    padding: 16px;
   }
 
   .flow-step strong {
@@ -640,6 +640,19 @@ h2 {
 
   .flow-arrow {
     font-size: 0.86rem;
+  }
+
+  .callout {
+    margin-top: 18px;
+    padding: 16px;
+  }
+
+  .resource-link {
+    padding: 14px 15px;
+  }
+
+  .setup-note {
+    padding: 16px;
   }
 }
 
