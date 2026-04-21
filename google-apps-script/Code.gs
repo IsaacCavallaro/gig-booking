@@ -1,9 +1,15 @@
+const SYNC_MAP_PREFIX = "SYNC_MAP_";
+
 function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
   const action = clean(params.action);
 
   if (action === "availability") {
     return availabilityResponse(params);
+  }
+
+  if (action === "sync") {
+    return textResponse(syncAvailability());
   }
 
   return textResponse("OK");
@@ -39,19 +45,9 @@ function doPost(e) {
       return textResponse("Rejected: submitted too quickly.");
     }
 
-    const calendar = CalendarApp.getCalendarById(config.calendarId);
-
-    if (!calendar) {
-      return textResponse("Calendar not found.");
-    }
-
-    const calendarTimeZone = calendar.getTimeZone();
-    const eventStart = parseDateTimeValue(dateValue, startTime, calendarTimeZone);
-    const eventEnd = parseDateTimeValue(dateValue, endTime, calendarTimeZone);
-
-    if (eventEnd.getTime() <= eventStart.getTime()) {
-      eventEnd.setDate(eventEnd.getDate() + 1);
-    }
+    const privateCalendar = getCalendarOrThrow(config.privateCalendarId, "Private calendar not found.");
+    const publicCalendar = getCalendarOrThrow(config.publicCalendarId, "Public calendar not found.");
+    const eventTimes = buildTimedRange(dateValue, startTime, endTime, privateCalendar.getTimeZone());
 
     const fingerprint = buildFingerprint({
       musicType,
@@ -69,36 +65,33 @@ function doPost(e) {
       return textResponse("Rejected: duplicate submission.");
     }
 
-    const description = [
-      "Gig request received from website",
-      "",
-      `Music type: ${musicType}`,
-      `Date: ${dateValue}`,
-      `Start time: ${startTime}`,
-      `End time: ${endTime}`,
-      `Location: ${location}`,
-      `Rate: ${rate}`,
-      `Gear provided: ${gearProvided}`,
-      `Load in: ${loadIn}`,
-      `Contact: ${contact || "-"}`,
-      `Timezone from browser: ${timezone || "-"}`,
-      "",
-      "Extra notes:",
-      notes || "-",
-    ].join("\n");
-
-    const event = calendar.createEvent(
+    const privateEvent = privateCalendar.createEvent(
       `${config.eventTitlePrefix} (${musicType}): ${location}`,
-      eventStart,
-      eventEnd,
+      eventTimes.start,
+      eventTimes.end,
       {
-        description,
+        description: buildPrivateEventDescription({
+          musicType,
+          dateValue,
+          startTime,
+          endTime,
+          location,
+          rate,
+          gearProvided,
+          loadIn,
+          contact,
+          notes,
+          timezone,
+        }),
         location,
       }
     );
 
-    event.setColor(CalendarApp.EventColor.PALE_GREEN);
-    rememberSubmission(fingerprint, event.getId(), config.cooldownSeconds);
+    privateEvent.setColor(CalendarApp.EventColor.PALE_GREEN);
+
+    const publicEvent = upsertPublicBlockForSourceEvent(privateEvent, publicCalendar, config);
+    rememberSubmission(fingerprint, privateEvent.getId(), config.cooldownSeconds);
+
     let mailStatus = "mail=ok";
 
     try {
@@ -115,14 +108,15 @@ function doPost(e) {
         contact,
         notes,
         timezone,
-        eventId: event.getId(),
+        privateEventId: privateEvent.getId(),
+        publicEventId: publicEvent ? publicEvent.getId() : "",
       });
     } catch (mailError) {
       mailStatus = `mail=failed:${mailError.message}`;
       Logger.log(`Mail send failed: ${mailError.message}`);
     }
 
-    return textResponse(`Created ${event.getId()} ${mailStatus}`);
+    return textResponse(`Created private=${privateEvent.getId()} public=${publicEvent.getId()} ${mailStatus}`);
   } catch (error) {
     return textResponse(`Error: ${error.message}`);
   }
@@ -134,15 +128,25 @@ function clean(value) {
 
 function getConfig() {
   const props = PropertiesService.getScriptProperties();
-  const calendarId = clean(props.getProperty("CALENDAR_ID"));
+  const privateCalendarId = clean(props.getProperty("PRIVATE_CALENDAR_ID"));
+  const publicCalendarId =
+    clean(props.getProperty("PUBLIC_CALENDAR_ID")) ||
+    clean(props.getProperty("CALENDAR_ID"));
   const eventTitlePrefix = clean(props.getProperty("EVENT_TITLE_PREFIX")) || "Music";
+  const publicEventTitle = clean(props.getProperty("PUBLIC_EVENT_TITLE")) || "Booked / On Hold";
   const notificationEmail = clean(props.getProperty("NOTIFICATION_EMAIL"));
   const defaultLookaheadDays = getNumberProperty(props, "DEFAULT_LOOKAHEAD_DAYS", 90);
   const minSubmitSeconds = getNumberProperty(props, "MIN_SUBMIT_SECONDS", 4);
   const cooldownSeconds = getNumberProperty(props, "COOLDOWN_SECONDS", 600);
+  const syncLookaheadDays = getNumberProperty(props, "SYNC_LOOKAHEAD_DAYS", 180);
+  const syncPastDays = getNumberProperty(props, "SYNC_PAST_DAYS", 2);
 
-  if (!calendarId) {
-    throw new Error("Missing script property: CALENDAR_ID");
+  if (!privateCalendarId) {
+    throw new Error("Missing script property: PRIVATE_CALENDAR_ID");
+  }
+
+  if (!publicCalendarId) {
+    throw new Error("Missing script property: PUBLIC_CALENDAR_ID");
   }
 
   if (!notificationEmail) {
@@ -150,12 +154,16 @@ function getConfig() {
   }
 
   return {
-    calendarId,
+    privateCalendarId,
+    publicCalendarId,
     eventTitlePrefix,
+    publicEventTitle,
     notificationEmail,
     defaultLookaheadDays,
     minSubmitSeconds,
     cooldownSeconds,
+    syncLookaheadDays,
+    syncPastDays,
   };
 }
 
@@ -163,11 +171,56 @@ function getNumberProperty(props, key, fallback) {
   const raw = clean(props.getProperty(key));
   const value = Number(raw);
 
-  if (!raw || Number.isNaN(value) || value <= 0) {
+  if (!raw || Number.isNaN(value) || value < 0) {
     return fallback;
   }
 
   return value;
+}
+
+function getCalendarOrThrow(calendarId, message) {
+  const calendar = CalendarApp.getCalendarById(calendarId);
+
+  if (!calendar) {
+    throw new Error(message);
+  }
+
+  return calendar;
+}
+
+function buildTimedRange(dateValue, startTime, endTime, timezone) {
+  const start = parseDateTimeValue(dateValue, startTime, timezone);
+  const end = parseDateTimeValue(dateValue, endTime, timezone);
+
+  if (end.getTime() <= start.getTime()) {
+    end.setDate(end.getDate() + 1);
+  }
+
+  return { start, end };
+}
+
+function buildPrivateEventDescription(details) {
+  return [
+    "Gig request received from website",
+    "",
+    `Music type: ${details.musicType}`,
+    `Date: ${details.dateValue}`,
+    `Start time: ${details.startTime}`,
+    `End time: ${details.endTime}`,
+    `Location: ${details.location}`,
+    `Rate: ${details.rate}`,
+    `Gear provided: ${details.gearProvided}`,
+    `Load in: ${details.loadIn}`,
+    `Contact: ${details.contact || "-"}`,
+    `Timezone from browser: ${details.timezone || "-"}`,
+    "",
+    "Extra notes:",
+    details.notes || "-",
+  ].join("\n");
+}
+
+function buildPublicBlockDescription() {
+  return "Availability blocker synced from private calendar.";
 }
 
 function isOldEnough(startedAt, minSubmitSeconds) {
@@ -193,7 +246,12 @@ function buildFingerprint(details) {
     clean(details.contact).toLowerCase(),
   ].join("|");
 
-  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, raw);
+  return digestHex(raw);
+}
+
+function digestHex(value) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, value);
+
   return bytes
     .map((byte) => {
       const normalized = byte < 0 ? byte + 256 : byte;
@@ -219,10 +277,13 @@ function rememberSubmission(fingerprint, eventId, cooldownSeconds) {
   cache.put(fingerprint, eventId || "1", cooldownSeconds);
 
   const props = PropertiesService.getScriptProperties();
-  props.setProperty(fingerprint, JSON.stringify({
-    eventId: eventId || "",
-    createdAt: new Date().toISOString(),
-  }));
+  props.setProperty(
+    fingerprint,
+    JSON.stringify({
+      eventId: eventId || "",
+      createdAt: new Date().toISOString(),
+    })
+  );
 }
 
 function sendBookingNotification(details) {
@@ -241,6 +302,8 @@ function sendBookingNotification(details) {
     `Gear provided: ${details.gearProvided}`,
     `Load in: ${details.loadIn}`,
     `Timezone from browser: ${details.timezone || "-"}`,
+    `Private calendar event ID: ${details.privateEventId || "-"}`,
+    `Public blocker event ID: ${details.publicEventId || "-"}`,
     "",
     "Extra notes:",
     details.notes || "-",
@@ -269,12 +332,7 @@ function availabilityResponse(params) {
   const config = getConfig();
   const callback = clean(params.callback);
   const days = Number(params.days) || config.defaultLookaheadDays;
-  const calendar = CalendarApp.getCalendarById(config.calendarId);
-
-  if (!calendar) {
-    return jsonpResponse(callback, { error: "Calendar not found." });
-  }
-
+  const calendar = getCalendarOrThrow(config.publicCalendarId, "Public calendar not found.");
   const timezone = calendar.getTimeZone();
   const start = new Date();
   start.setHours(0, 0, 0, 0);
@@ -291,6 +349,196 @@ function availabilityResponse(params) {
     days,
     timezone,
   });
+}
+
+function syncAvailability() {
+  const config = getConfig();
+  const privateCalendar = getCalendarOrThrow(config.privateCalendarId, "Private calendar not found.");
+  const publicCalendar = getCalendarOrThrow(config.publicCalendarId, "Public calendar not found.");
+  const start = atMidnight(new Date());
+  start.setDate(start.getDate() - config.syncPastDays);
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + config.syncLookaheadDays);
+
+  const sourceEvents = privateCalendar.getEvents(start, end);
+  const activeSourceIds = {};
+  let upserted = 0;
+
+  sourceEvents.forEach((sourceEvent) => {
+    if (!shouldSyncSourceEvent(sourceEvent, config)) {
+      return;
+    }
+
+    upsertPublicBlockForSourceEvent(sourceEvent, publicCalendar, config);
+    activeSourceIds[sourceEvent.getId()] = true;
+    upserted += 1;
+  });
+
+  const removed = cleanupOrphanedPublicBlocks(publicCalendar, activeSourceIds);
+
+  const summary = `Synced ${upserted} source events and removed ${removed} orphaned blockers.`;
+  Logger.log(summary);
+  return summary;
+}
+
+function shouldSyncSourceEvent(sourceEvent, config) {
+  if (sourceEvent.getTitle() === config.publicEventTitle) {
+    return false;
+  }
+
+  return true;
+}
+
+function upsertPublicBlockForSourceEvent(sourceEvent, publicCalendar, config) {
+  const publicDescription = buildPublicBlockDescription();
+  const existing = getMappedPublicEvent(publicCalendar, sourceEvent.getId());
+
+  if (sourceEvent.isAllDayEvent()) {
+    return upsertAllDayPublicBlock(existing, sourceEvent, publicCalendar, config, publicDescription);
+  }
+
+  return upsertTimedPublicBlock(existing, sourceEvent, publicCalendar, config, publicDescription);
+}
+
+function upsertTimedPublicBlock(existing, sourceEvent, publicCalendar, config, description) {
+  if (existing && existing.isAllDayEvent()) {
+    existing.deleteEvent();
+    clearSyncMapping(sourceEvent.getId());
+    existing = null;
+  }
+
+  const start = sourceEvent.getStartTime();
+  const end = sourceEvent.getEndTime();
+
+  if (!existing) {
+    const created = publicCalendar.createEvent(config.publicEventTitle, start, end, {
+      description,
+    });
+    created.setColor(CalendarApp.EventColor.PALE_GREEN);
+    setSyncMapping(sourceEvent.getId(), created.getId());
+    return created;
+  }
+
+  existing.setTitle(config.publicEventTitle);
+  existing.setDescription(description);
+  existing.setTime(start, end);
+  existing.setColor(CalendarApp.EventColor.PALE_GREEN);
+  return existing;
+}
+
+function upsertAllDayPublicBlock(existing, sourceEvent, publicCalendar, config, description) {
+  if (existing && !existing.isAllDayEvent()) {
+    existing.deleteEvent();
+    clearSyncMapping(sourceEvent.getId());
+    existing = null;
+  }
+
+  const start = atMidnight(sourceEvent.getStartTime());
+  const end = atMidnight(sourceEvent.getEndTime());
+
+  if (!existing) {
+    const created = publicCalendar.createAllDayEvent(config.publicEventTitle, start, end, {
+      description,
+    });
+    created.setColor(CalendarApp.EventColor.PALE_GREEN);
+    setSyncMapping(sourceEvent.getId(), created.getId());
+    return created;
+  }
+
+  existing.setTitle(config.publicEventTitle);
+  existing.setDescription(description);
+  existing.setAllDayDates(start, end);
+  existing.setColor(CalendarApp.EventColor.PALE_GREEN);
+  return existing;
+}
+
+function cleanupOrphanedPublicBlocks(publicCalendar, activeSourceIds) {
+  const props = PropertiesService.getScriptProperties();
+  const allProps = props.getProperties();
+  let removed = 0;
+
+  Object.keys(allProps).forEach((key) => {
+    if (!key.startsWith(SYNC_MAP_PREFIX)) {
+      return;
+    }
+
+    let parsed;
+
+    try {
+      parsed = JSON.parse(allProps[key]);
+    } catch (error) {
+      props.deleteProperty(key);
+      return;
+    }
+
+    if (activeSourceIds[parsed.sourceEventId]) {
+      return;
+    }
+
+    const publicEvent = parsed.publicEventId
+      ? publicCalendar.getEventById(parsed.publicEventId)
+      : null;
+
+    if (publicEvent) {
+      publicEvent.deleteEvent();
+      removed += 1;
+    }
+
+    props.deleteProperty(key);
+  });
+
+  return removed;
+}
+
+function getMappedPublicEvent(publicCalendar, sourceEventId) {
+  const props = PropertiesService.getScriptProperties();
+  const key = syncMapKey(sourceEventId);
+  const raw = props.getProperty(key);
+
+  if (!raw) {
+    return null;
+  }
+
+  let parsed;
+
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    props.deleteProperty(key);
+    return null;
+  }
+
+  const publicEvent = parsed.publicEventId
+    ? publicCalendar.getEventById(parsed.publicEventId)
+    : null;
+
+  if (!publicEvent) {
+    props.deleteProperty(key);
+    return null;
+  }
+
+  return publicEvent;
+}
+
+function setSyncMapping(sourceEventId, publicEventId) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(
+    syncMapKey(sourceEventId),
+    JSON.stringify({
+      sourceEventId,
+      publicEventId,
+      updatedAt: new Date().toISOString(),
+    })
+  );
+}
+
+function clearSyncMapping(sourceEventId) {
+  PropertiesService.getScriptProperties().deleteProperty(syncMapKey(sourceEventId));
+}
+
+function syncMapKey(sourceEventId) {
+  return `${SYNC_MAP_PREFIX}${digestHex(sourceEventId)}`;
 }
 
 function parseDateTimeValue(dateValue, timeValue, timezone) {
@@ -372,10 +620,14 @@ function jsonpResponse(callback, payload) {
 
 function printSetupInstructions() {
   Logger.log("Add these Script Properties:");
-  Logger.log("CALENDAR_ID=your-calendar-id@group.calendar.google.com");
+  Logger.log("PRIVATE_CALENDAR_ID=your-private-source-calendar@gmail.com");
+  Logger.log("PUBLIC_CALENDAR_ID=your-public-availability-calendar@group.calendar.google.com");
   Logger.log("EVENT_TITLE_PREFIX=Music");
+  Logger.log("PUBLIC_EVENT_TITLE=Booked / On Hold");
   Logger.log("NOTIFICATION_EMAIL=you@example.com");
   Logger.log("DEFAULT_LOOKAHEAD_DAYS=90");
   Logger.log("MIN_SUBMIT_SECONDS=4");
   Logger.log("COOLDOWN_SECONDS=600");
+  Logger.log("SYNC_LOOKAHEAD_DAYS=180");
+  Logger.log("SYNC_PAST_DAYS=2");
 }
