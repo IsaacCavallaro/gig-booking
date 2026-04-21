@@ -65,6 +65,23 @@ This uses the simplest free architecture that still allows calendar writes.
 
 GitHub Pages is static hosting only. It can serve the website, but it cannot securely create Google Calendar events by itself. Google Apps Script is the minimal Google-native backend that can receive the form submission, write to Google Calendar, and send an email.
 
+```mermaid
+flowchart LR
+    Booker[Booker]
+    Site[GitHub Pages Site]
+    PublicCal[Public Google Calendar]
+    Script[Google Apps Script]
+    TargetCal[Target Google Calendar]
+    Email[Gmail Notification]
+
+    Booker -->|view availability| Site
+    Site -->|embed| PublicCal
+    Booker -->|submit booking form| Site
+    Site -->|POST booking request| Script
+    Script -->|create timed event| TargetCal
+    Script -->|send notification| Email
+```
+
 ## Free architecture summary
 
 - Website hosting: GitHub Pages
@@ -83,33 +100,6 @@ GitHub Pages is static hosting only. It can serve the website, but it cannot sec
   Frontend configuration, calendar wiring, form handling, and UI feedback.
 - `google-apps-script/Code.gs`
   Google Apps Script backend that creates the event, sends the email, and applies anti-bot rules.
-
-## Current configuration
-
-The project is currently wired to this Google Calendar ID:
-
-- `ialdeqca146a7eggkirrh1mjcc@group.calendar.google.com`
-
-The frontend is already configured with:
-
-- the public calendar embed URL
-- the public calendar page URL
-- the deployed Apps Script `/exec` URL
-- music type options
-- playlist links shown at the bottom of the page
-
-## Local development
-
-```bash
-cd /Users/isaaccavallaro/Development/personal/gig-booking
-python3 -m http.server 4311 --bind 127.0.0.1
-```
-
-Then open:
-
-```text
-http://127.0.0.1:4311/
-```
 
 ## Deploying the website with GitHub Pages
 
