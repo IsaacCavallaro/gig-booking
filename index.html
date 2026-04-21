@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gig Availability</title>
+    <meta
+      name="description"
+      content="Simple gig availability page with an embedded Google Calendar and booking form."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="eyebrow">$ music-bookings --status live</p>
+        <h1 id="page-title">Check dates. Book fast.</h1>
+        <p class="intro" id="page-intro"></p>
+      </section>
+
+      <section class="panel panel-accent" id="how-to-use">
+        <div class="panel-header tight">
+          <div>
+            <h2>How To Use</h2>
+            <p>Run the flow from top to bottom.</p>
+          </div>
+        </div>
+
+        <div class="flow-chart" aria-label="How to use flow">
+          <div class="flow-step">
+            <span class="flow-number">1</span>
+            <strong>CHECK_CALENDAR</strong>
+            <span>Confirm the date looks open.</span>
+          </div>
+          <div class="flow-connector" aria-hidden="true">
+            <span class="flow-line"></span>
+            <span class="flow-arrow flow-arrow-down">v</span>
+            <span class="flow-arrow flow-arrow-right">--&gt;</span>
+          </div>
+          <div class="flow-step">
+            <span class="flow-number">2</span>
+            <strong>FILL_FORM</strong>
+            <span>Add date, location, rate, gear, and load in.</span>
+          </div>
+          <div class="flow-connector" aria-hidden="true">
+            <span class="flow-line"></span>
+            <span class="flow-arrow flow-arrow-down">v</span>
+            <span class="flow-arrow flow-arrow-right">--&gt;</span>
+          </div>
+          <div class="flow-step">
+            <span class="flow-number">3</span>
+            <strong>SUBMIT</strong>
+            <span>A pencilled Music event is added to my calendar.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="availability">
+        <div class="panel-header">
+          <div>
+            <h2>[1] Check Availability</h2>
+            <p>Inspect the calendar before submitting a request.</p>
+          </div>
+          <a class="text-link" id="calendar-link" href="#availability">open_full_calendar</a>
+        </div>
+
+        <div class="calendar-shell" id="calendar-shell">
+          <iframe
+            id="calendar-embed"
+            title="Gig availability calendar"
+            loading="lazy"
+            referrerpolicy="strict-origin-when-cross-origin"
+          ></iframe>
+        </div>
+
+        <div class="setup-note" id="calendar-note" hidden>
+          Add your public Google Calendar embed URL in <code>app.js</code> to show availability here.
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header tight">
+          <div>
+            <h2>[2] Submit Booking Details</h2>
+            <p>If the date looks free, complete the input fields and submit once.</p>
+          </div>
+        </div>
+
+        <form id="booking-form" class="booking-form" method="post" target="submission-frame">
+          <label>
+            Music type
+            <div class="input-shell input-shell-select">
+              <select name="musicType" id="music-type-select"></select>
+            </div>
+          </label>
+
+          <label>
+            Date
+            <div class="input-shell input-shell-date">
+              <input name="date" type="date" required />
+            </div>
+          </label>
+
+          <label>
+            Location
+            <input name="location" type="text" placeholder="Venue / suburb" required />
+          </label>
+
+          <label>
+            Rate
+            <input name="rate" type="text" placeholder="$600 + dinner tab" required />
+          </label>
+
+          <label>
+            Gear provided
+            <input name="gearProvided" type="text" placeholder="Drums provided, bring microphones" required />
+          </label>
+
+          <label>
+            Load in
+            <input name="loadIn" type="text" placeholder="5:30pm rear laneway access" required />
+          </label>
+
+          <label class="full-width">
+            Booker / contact
+            <input name="contact" type="text" placeholder="Name or bandleader" />
+          </label>
+
+          <label class="full-width">
+            Extra notes
+            <textarea
+              name="notes"
+              rows="4"
+              placeholder="Any specific setlists or unique details for this event?"
+            ></textarea>
+          </label>
+
+          <input id="timezone-input" name="timezone" type="hidden" />
+          <input id="started-at-input" name="startedAt" type="hidden" />
+          <label class="visually-hidden" aria-hidden="true">
+            Leave this blank
+            <input name="website" type="text" tabindex="-1" autocomplete="off" />
+          </label>
+
+          <div class="actions full-width">
+            <button id="submit-button" class="button" type="submit">create_pencilled_event</button>
+          </div>
+        </form>
+
+        <iframe name="submission-frame" class="hidden-frame" title="Booking submission"></iframe>
+
+        <div class="callout">
+          <strong>note</strong>
+          <p>
+            If you want to be the admin of the calendar invite, you can always send me your own invite later.
+            This form simply pencils in the date first so the slot is held and I do not get double booked.
+          </p>
+        </div>
+
+        <div class="actions">
+          <p class="status" id="form-status"></p>
+        </div>
+      </section>
+
+      <section class="panel panel-muted">
+        <h2>Output</h2>
+        <ol class="steps">
+          <li>A new Music event is created in my calendar.</li>
+          <li>I review the details and confirm from there.</li>
+          <li>If anything is unclear, I follow up directly.</li>
+        </ol>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header tight">
+          <div>
+            <h2>Links</h2>
+            <p>Drumming and original music examples.</p>
+          </div>
+        </div>
+
+        <div class="resource-links" id="links-list"></div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
