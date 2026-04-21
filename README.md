@@ -118,17 +118,26 @@ Because the frontend is static, there is no build step required.
 2. Create a standalone project.
 3. Paste in `google-apps-script/Code.gs`.
 4. Save the script.
-5. Review the constants at the top:
+5. Open `Project Settings` and add these Script Properties:
    - `CALENDAR_ID`
    - `EVENT_TITLE_PREFIX`
    - `NOTIFICATION_EMAIL`
-   - anti-bot values such as `MIN_SUBMIT_SECONDS` and `COOLDOWN_SECONDS`
-6. Deploy the project as a web app:
+6. Keep these non-sensitive behavior values in code unless you want to tune them:
+   - `DEFAULT_LOOKAHEAD_DAYS`
+   - `MIN_SUBMIT_SECONDS`
+   - `COOLDOWN_SECONDS`
+7. Deploy the project as a web app:
    - Execute as: `Me`
    - Who has access: `Anyone`
-7. Copy the deployed `/exec` URL.
-8. Paste that URL into `app.js` as `appsScriptWebAppUrl`.
-9. Redeploy the Apps Script whenever the backend code changes.
+8. Copy the deployed `/exec` URL.
+9. Paste that URL into `app.js` as `appsScriptWebAppUrl`.
+10. Redeploy the Apps Script whenever the backend code changes.
+
+Important note:
+
+- `NOTIFICATION_EMAIL` should not live in the repo
+- the target write calendar ID also does not need to live in the repo backend code
+- the public availability calendar may still be inferable from the frontend because this project intentionally uses a public Google Calendar embed on a static site
 
 ## Frontend configuration
 

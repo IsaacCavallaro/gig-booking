@@ -1,7 +1,4 @@
-const CALENDAR_ID = "ialdeqca146a7eggkirrh1mjcc@group.calendar.google.com";
-const EVENT_TITLE_PREFIX = "Music";
 const DEFAULT_LOOKAHEAD_DAYS = 90;
-const NOTIFICATION_EMAIL = "isaaccavallaro@gmail.com";
 const MIN_SUBMIT_SECONDS = 4;
 const COOLDOWN_SECONDS = 600;
 
@@ -18,6 +15,7 @@ function doGet(e) {
 
 function doPost(e) {
   try {
+    const config = getConfig();
     const params = e && e.parameter ? e.parameter : {};
     const musicType = clean(params.musicType) || "Gigs";
     const dateValue = params.date;
@@ -45,7 +43,7 @@ function doPost(e) {
       return textResponse("Rejected: submitted too quickly.");
     }
 
-    const calendar = CalendarApp.getCalendarById(CALENDAR_ID);
+    const calendar = CalendarApp.getCalendarById(config.calendarId);
 
     if (!calendar) {
       return textResponse("Calendar not found.");
@@ -94,7 +92,7 @@ function doPost(e) {
     ].join("\n");
 
     const event = calendar.createEvent(
-      `${EVENT_TITLE_PREFIX} (${musicType}): ${location}`,
+      `${config.eventTitlePrefix} (${musicType}): ${location}`,
       eventStart,
       eventEnd,
       {
@@ -109,6 +107,7 @@ function doPost(e) {
 
     try {
       sendBookingNotification({
+        notificationEmail: config.notificationEmail,
         musicType,
         dateValue,
         startTime,
@@ -135,6 +134,27 @@ function doPost(e) {
 
 function clean(value) {
   return String(value || "").trim();
+}
+
+function getConfig() {
+  const props = PropertiesService.getScriptProperties();
+  const calendarId = clean(props.getProperty("CALENDAR_ID"));
+  const eventTitlePrefix = clean(props.getProperty("EVENT_TITLE_PREFIX")) || "Music";
+  const notificationEmail = clean(props.getProperty("NOTIFICATION_EMAIL"));
+
+  if (!calendarId) {
+    throw new Error("Missing script property: CALENDAR_ID");
+  }
+
+  if (!notificationEmail) {
+    throw new Error("Missing script property: NOTIFICATION_EMAIL");
+  }
+
+  return {
+    calendarId,
+    eventTitlePrefix,
+    notificationEmail,
+  };
 }
 
 function isOldEnough(startedAt) {
@@ -214,7 +234,7 @@ function sendBookingNotification(details) {
   ].join("\n");
 
   MailApp.sendEmail({
-    to: NOTIFICATION_EMAIL,
+    to: details.notificationEmail,
     subject,
     body,
     name: "Gig Booking Site",
@@ -222,8 +242,10 @@ function sendBookingNotification(details) {
 }
 
 function testEmail() {
+  const config = getConfig();
+
   MailApp.sendEmail({
-    to: NOTIFICATION_EMAIL,
+    to: config.notificationEmail,
     subject: "Apps Script mail test",
     body: "If you received this, MailApp is authorized and working.",
     name: "Gig Booking Site",
@@ -231,9 +253,10 @@ function testEmail() {
 }
 
 function availabilityResponse(params) {
+  const config = getConfig();
   const callback = clean(params.callback);
   const days = Number(params.days) || DEFAULT_LOOKAHEAD_DAYS;
-  const calendar = CalendarApp.getCalendarById(CALENDAR_ID);
+  const calendar = CalendarApp.getCalendarById(config.calendarId);
 
   if (!calendar) {
     return jsonpResponse(callback, { error: "Calendar not found." });
@@ -332,4 +355,11 @@ function jsonpResponse(callback, payload) {
   const mimeType = callback ? ContentService.MimeType.JAVASCRIPT : ContentService.MimeType.JSON;
 
   return ContentService.createTextOutput(body).setMimeType(mimeType);
+}
+
+function printSetupInstructions() {
+  Logger.log("Add these Script Properties:");
+  Logger.log("CALENDAR_ID=your-calendar-id@group.calendar.google.com");
+  Logger.log("EVENT_TITLE_PREFIX=Music");
+  Logger.log("NOTIFICATION_EMAIL=you@example.com");
 }
