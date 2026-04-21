@@ -453,6 +453,8 @@ h2 {
   border: 1px solid var(--line);
   background: #0b0b0b;
   min-width: 0;
+  justify-items: center;
+  text-align: center;
 }
 
 .flow-step strong {
@@ -615,7 +617,7 @@ h2 {
   }
 
   .steps {
-    padding-left: 16px;
+    padding-left: 24px;
   }
 
   .flow-chart {
